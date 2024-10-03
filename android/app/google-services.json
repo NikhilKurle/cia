@@ -1,0 +1,40 @@
+{
+  "project_info": {
+    "project_number": "215528592295",
+    "firebase_url": "https://cehpoint-30581-default-rtdb.firebaseio.com",
+    "project_id": "cehpoint-30581",
+    "storage_bucket": "cehpoint-30581.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:215528592295:android:6771852388e2eeb35d1c82",
+        "android_client_info": {
+          "package_name": "com.cia"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "215528592295-leuk6eac4copg6tf08lrs5v5q5uc0p2m.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAvSG0uqy9dSFTLaZtqhPvJhu6ROIKic0M"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "215528592295-leuk6eac4copg6tf08lrs5v5q5uc0p2m.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

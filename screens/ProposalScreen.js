@@ -1,31 +1,57 @@
-import React, { useEffect, useState } from 'react';
-import { View, ScrollView, StyleSheet } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, ScrollView, FlatList, StyleSheet } from 'react-native';
 import { Card, Button, Text, ActivityIndicator, Divider, TextInput } from 'react-native-paper';
+import { getFirestore, collection, query, where, getDocs } from '@firebase/firestore';
+import { getAuth } from '@firebase/auth';
 import { generateProposal } from '../src/services/geminiService';
 
-export default function ProposalScreen({ route, navigation }) {
-  const { business } = route.params;
-  const [proposal, setProposal] = useState('');
+const ProposalScreen = ({ route, navigation }) => {
+  const business = route.params?.business;
+  const [proposals, setProposals] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [proposal, setProposal] = useState('');
   const [clientDetails, setClientDetails] = useState({
     clientName: '',
     companyName: '',
     address: '',
     phoneNumber: '',
-    email: '',
+    email: '',  
   });
+  const auth = getAuth();
+  const db = getFirestore();
 
   useEffect(() => {
-    generateProposal(business)
-      .then(result => {
+    const fetchProposals = async () => {
+      if (auth.currentUser) {
+        const q = query(
+          collection(db, 'proposals'),
+          where('userId', '==', auth.currentUser.uid),
+          where('status', '==', 'accepted')
+        );
+        const querySnapshot = await getDocs(q);
+        const fetchedProposals = querySnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        setProposals(fetchedProposals);
+        setLoading(false);
+      }
+    };
+
+    const generateDynamicProposal = async () => {
+      try {
+        const result = await generateProposal(business);
         setProposal(result);
         setLoading(false);
-      })
-      .catch(error => {
+      } catch (error) {
         console.error(error);
         setLoading(false);
-      });
-  }, [business]);
+      }
+    };
+
+    fetchProposals();
+    generateDynamicProposal();
+  }, [business, auth.currentUser]);
 
   const renderFormattedContent = (content) => {
     if (!content) return null;
@@ -36,30 +62,13 @@ export default function ProposalScreen({ route, navigation }) {
       <View style={styles.proposalContent}>
         {sections.map((section, index) => {
           const lines = section.split('\n');
-          
           return (
             <View key={index} style={styles.section}>
-              {lines.map((line, lineIndex) => {
-                if (line.startsWith("") && line.endsWith("")) {
-                  return (
-                    <Text key={lineIndex} style={styles.sectionHeader}>
-                      {line.replace(/\*\*/g, "")}
-                    </Text>
-                  );
-                } else if (line.trim().startsWith("*") || line.trim().startsWith("-")) {
-                  return (
-                    <Text key={lineIndex} style={styles.bulletPoint}>
-                      • {line.trim().substring(1)}
-                    </Text>
-                  );
-                } else {
-                  return (
-                    <Text key={lineIndex} style={styles.sectionContent}>
-                      {line.trim()}
-                    </Text>
-                  );
-                }
-              })}
+              {lines.map((line, lineIndex) => (
+                <Text key={lineIndex} style={line.startsWith('*') ? styles.bulletPoint : styles.sectionContent}>
+                  {line.trim().startsWith('*') ? `• ${line.trim().substring(1)}` : line.trim()}
+                </Text>
+              ))}
               {index < sections.length - 1 && <Divider style={styles.divider} />}
             </View>
           );
@@ -71,38 +80,24 @@ export default function ProposalScreen({ route, navigation }) {
   const renderClientDetailsForm = () => (
     <View style={styles.clientDetailsForm}>
       <Text style={styles.formHeader}>Client Details</Text>
-      <TextInput
-        label="Client Name"
-        value={clientDetails.clientName}
-        onChangeText={(text) => setClientDetails({ ...clientDetails, clientName: text })}
-        style={styles.input}
-      />
-      <TextInput
-        label="Company Name"
-        value={clientDetails.companyName}
-        onChangeText={(text) => setClientDetails({ ...clientDetails, companyName: text })}
-        style={styles.input}
-      />
-      <TextInput
-        label="Address"
-        value={clientDetails.address}
-        onChangeText={(text) => setClientDetails({ ...clientDetails, address: text })}
-        style={styles.input}
-      />
-      <TextInput
-        label="Phone Number"
-        value={clientDetails.phoneNumber}
-        onChangeText={(text) => setClientDetails({ ...clientDetails, phoneNumber: text })}
-        style={styles.input}
-        keyboardType="phone-pad"
-      />
-      <TextInput
-        label="Email"
-        value={clientDetails.email}
-        onChangeText={(text) => setClientDetails({ ...clientDetails, email: text })}
-        style={styles.input}
-        keyboardType="email-address"
-      />
+      {['clientName', 'companyName', 'address', 'phoneNumber', 'email'].map((field) => (
+        <TextInput
+          key={field}
+          label={field.split(/(?=[A-Z])/).join(' ')}
+          value={clientDetails[field]}
+          onChangeText={(text) => setClientDetails({ ...clientDetails, [field]: text })}
+          style={styles.input}
+          keyboardType={field === 'phoneNumber' ? 'phone-pad' : field === 'email' ? 'email-address' : 'default'}
+        />
+      ))}
+    </View>
+  );
+
+  const renderProposal = ({ item }) => (
+    <View style={styles.proposalItem}>
+      <Text style={styles.proposalTitle}>{item.title}</Text>
+      <Text>Status: {item.status}</Text>
+      <Text>Quotation: ${item.quotation}</Text>
     </View>
   );
 
@@ -116,17 +111,15 @@ export default function ProposalScreen({ route, navigation }) {
 
   return (
     <ScrollView style={styles.container}>
+      <Text style={styles.title}>Accepted Proposals</Text>
+      <FlatList
+        data={proposals}
+        renderItem={renderProposal}
+        keyExtractor={item => item.id}
+      />
       <Card style={styles.card}>
         <Card.Content>
-          <View style={styles.headerContainer}>
-            <Text style={styles.companyName}>
-              Cehpoint E-Learning & Cyber Security Solutions
-            </Text>
-            <Text style={styles.companyTagline}>
-              A Secure Choice for Your Career and Our World
-            </Text>
-          </View>
-          <Divider style={styles.divider} />
+          <Text style={styles.companyName}>Generated Proposal for {business.name}</Text>
           {renderFormattedContent(proposal)}
           {renderClientDetailsForm()}
         </Card.Content>
@@ -149,77 +142,55 @@ export default function ProposalScreen({ route, navigation }) {
       </Card>
     </ScrollView>
   );
-}
-
+};
 
 const styles = StyleSheet.create({
-    container: {
-      flex: 1,
-      padding: 16,
-      backgroundColor: '#f5f5f5',
-    },
-    card: {
-      marginBottom: 16,
-      elevation: 4,
-    },
-    headerContainer: {
-      alignItems: 'center',
-      marginBottom: 16,
-    },
-    companyName: {
-      fontSize: 24,
-      fontWeight: 'bold',
-      color: '#2c3e50',
-      textAlign: 'center',
-      marginBottom: 8,
-    },
-    companyTagline: {
-      fontSize: 16,
-      color: '#34495e',
-      textAlign: 'center',
-      fontStyle: 'italic',
-    },
-    proposalContent: {
-      marginTop: 16,
-    },
-    section: {
-      marginVertical: 12,
-    },
-    sectionHeader: {
-      fontSize: 18,
-      fontWeight: 'bold',
-      color: '#2c3e50',
-      marginBottom: 8,
-    },
-    sectionContent: {
-      fontSize: 16,
-      lineHeight: 24,
-      color: '#34495e',
-      marginBottom: 4,
-    },
-    bulletPoint: {
-      fontSize: 16,
-      lineHeight: 24,
-      color: '#34495e',
-      marginLeft: 16,
-      marginBottom: 4,
-    },
-    divider: {
-      marginVertical: 16,
-    },
-    actions: {
-      justifyContent: 'space-around',
-      padding: 16,
-    },
-    actionButton: {
-      minWidth: 140,
-    },
-    centered: {
-      flex: 1,
-      justifyContent: 'center',
-      alignItems: 'center',
-    },
-  // ... (previous styles remain the same)
+  container: {
+    flex: 1,
+    padding: 16,
+    backgroundColor: '#f5f5f5',
+  },
+  title: {
+    fontSize: 24,
+    marginBottom: 16,
+  },
+  proposalItem: {
+    backgroundColor: '#f0f0f0',
+    padding: 16,
+    marginBottom: 8,
+    borderRadius: 8,
+  },
+  proposalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  card: {
+    marginBottom: 16,
+    elevation: 4,
+  },
+  companyName: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  proposalContent: {
+    marginTop: 16,
+  },
+  section: {
+    marginVertical: 12,
+  },
+  sectionContent: {
+    fontSize: 16,
+    color: '#34495e',
+  },
+  bulletPoint: {
+    fontSize: 16,
+    marginLeft: 16,
+  },
+  divider: {
+    marginVertical: 16,
+  },
   clientDetailsForm: {
     marginTop: 24,
   },
@@ -231,7 +202,18 @@ const styles = StyleSheet.create({
   input: {
     marginBottom: 16,
   },
+  actions: {
+    justifyContent: 'space-around',
+    padding: 16,
+  },
+  actionButton: {
+    minWidth: 140,
+  },
+  centered: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
 });
 
-
-
+export default ProposalScreen;
