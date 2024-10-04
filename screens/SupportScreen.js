@@ -3,12 +3,23 @@ import React, { useState, useEffect } from 'react';
 import { View, FlatList, StyleSheet } from 'react-native';
 import { TextInput, Button, Card, Text } from 'react-native-paper';
 import { db } from '../firebase.config';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function SupportScreen() {
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
+  const [isSupport, setIsSupport] = useState(false);
 
   useEffect(() => {
+    const checkIfSupport = async () => {
+      const storedEmail = await AsyncStorage.getItem('email');
+      if (storedEmail === 'support@abc.com') {
+        setIsSupport(true);
+      }
+    };
+
+    checkIfSupport();
+
     const unsubscribe = db.collection('messages')
       .orderBy('timestamp', 'desc')
       .onSnapshot(snapshot => {
@@ -24,26 +35,29 @@ export default function SupportScreen() {
 
   const sendMessage = async () => {
     if (newMessage.trim()) {
+      const sender = isSupport ? 'support' : 'client';
       await db.collection('messages').add({
         text: newMessage,
         timestamp: new Date(),
-        sender: 'client' // Or use actual user ID
+        sender: sender
       });
       setNewMessage('');
     }
   };
 
+  const renderItem = ({ item }) => (
+    <Card style={[styles.messageCard, item.sender === 'support' ? styles.supportMessage : styles.clientMessage]}>
+      <Card.Content>
+        <Text>{item.sender === 'support' ? 'Support: ' : 'Client: '}{item.text}</Text>
+      </Card.Content>
+    </Card>
+  );
+
   return (
     <View style={styles.container}>
       <FlatList
         data={messages}
-        renderItem={({ item }) => (
-          <Card style={styles.messageCard}>
-            <Card.Content>
-              <Text>{item.text}</Text>
-            </Card.Content>
-          </Card>
-        )}
+        renderItem={renderItem}
         keyExtractor={item => item.id}
         inverted
       />
@@ -61,27 +75,28 @@ export default function SupportScreen() {
     </View>
   );
 }
+
 const styles = StyleSheet.create({
-    container: {
-      flex: 1,
-      padding: 16,
-    },
-    card: {
-      marginBottom: 16,
-    },
-    input: {
-      marginBottom: 16,
-    },
-    button: {
-      marginTop: 8,
-    },
-    centered: {
-      flex: 1,
-      justifyContent: 'center',
-      alignItems: 'center',
-    },
-    proposalText: {
-      marginTop: 16,
-      lineHeight: 24,
-    },
-  });
+  container: {
+    flex: 1,
+    padding: 16,
+  },
+  messageCard: {
+    marginBottom: 8,
+  },
+  clientMessage: {
+    backgroundColor: '#f1f1f1',
+  },
+  supportMessage: {
+    backgroundColor: '#d1f7c4',
+  },
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 16,
+  },
+  input: {
+    flex: 1,
+    marginRight: 8,
+  },
+});

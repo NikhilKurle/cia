@@ -14,6 +14,7 @@ import QuotationScreen from './screens/QuotationScreen';
 import SupportScreen from './screens/SupportScreen';
 import AuthScreen from './screens/AuthScreen';
 import ProfileScreen from './screens/ProfileScreen';
+import ChatScreen from './screens/ChatScreen';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -39,8 +40,9 @@ function MainTabs() {
   return (
     <Tab.Navigator>
       <Tab.Screen name="Business" component={BusinessInfoScreen} />
-      <Tab.Screen name="Proposals" component={ProposalScreen} />
+      <Tab.Screen name="Proposal" component={ProposalScreen} />
       <Tab.Screen name="Profile" component={ProfileScreen} />
+      
     </Tab.Navigator>
   );
 }
@@ -50,7 +52,7 @@ export default function App() {
 
   useEffect(() => {
     GoogleSignin.configure({
-      webClientId: 'YOUR_WEB_CLIENT_ID.apps.googleusercontent.com', // Get this from your Google Cloud Console
+      webClientId: '215528592295-leuk6eac4copg6tf08lrs5v5q5uc0p2m.apps.googleusercontent.com', // Get this from your Google Cloud Console
       offlineAccess: true, // if you want to access Google API on behalf of the user FROM YOUR SERVER
       forceCodeForRefreshToken: true, // [Android] related to `serverAuthCode`, read the docs link below *.
     });
@@ -65,6 +67,7 @@ export default function App() {
     <PaperProvider>
       <NavigationContainer>
         <Stack.Navigator>
+          
           {user ? (
             <>
               <Stack.Screen 
@@ -74,6 +77,8 @@ export default function App() {
               />
               <Stack.Screen name="Quotation" component={QuotationScreen} />
               <Stack.Screen name="Support" component={SupportScreen} />
+              <Stack.Screen name="chats" component={ChatScreen} />
+             
             </>
           ) : (
             <Stack.Screen 
@@ -81,7 +86,9 @@ export default function App() {
               component={AuthScreen} 
               options={{ title: 'Login / Sign Up' }}
             />
+            
           )}
+           
         </Stack.Navigator>
       </NavigationContainer>
     </PaperProvider>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, ScrollView, FlatList, StyleSheet } from 'react-native';
+import { View, ScrollView, FlatList, StyleSheet, TouchableOpacity } from 'react-native';
 import { Card, Button, Text, ActivityIndicator, Divider, TextInput } from 'react-native-paper';
 import { getFirestore, collection, query, where, getDocs } from '@firebase/firestore';
 import { getAuth } from '@firebase/auth';
@@ -19,6 +19,11 @@ const ProposalScreen = ({ route, navigation }) => {
   });
   const auth = getAuth();
   const db = getFirestore();
+
+
+  const handelNaviagte =()=>{
+    navigation.navigate('chats')
+ }
 
   useEffect(() => {
     const fetchProposals = async () => {
@@ -108,7 +113,6 @@ const ProposalScreen = ({ route, navigation }) => {
       </View>
     );
   }
-
   return (
     <ScrollView style={styles.container}>
       <Text style={styles.title}>Accepted Proposals</Text>
@@ -131,13 +135,13 @@ const ProposalScreen = ({ route, navigation }) => {
           >
             Generate Quotation
           </Button>
-          <Button 
+          <TouchableOpacity 
             mode="outlined" 
-            onPress={() => navigation.navigate('Support')} 
+            onPress={()=>handelNaviagte()} 
             style={styles.actionButton}
           >
-            Contact Sales
-          </Button>
+            <Text>Contact Sales</Text>
+          </TouchableOpacity>
         </Card.Actions>
       </Card>
     </ScrollView>

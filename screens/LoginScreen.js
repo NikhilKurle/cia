@@ -1,20 +1,24 @@
 import React, { useState } from 'react';
 import { View, Alert, StyleSheet } from 'react-native';
-import { TextInput, Button, Text, Card, Title, ActivityIndicator } from 'react-native-paper';
+import { TextInput, Button, Title, ActivityIndicator, Card } from 'react-native-paper';
 import { auth, firestore } from './firebase';
 
 const LoginScreen = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [isLogin, setIsLogin] = useState(true); // Toggle between login and registration
+  const [name, setName] = useState('');
+  const [isLogin, setIsLogin] = useState(true);   
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   const handleLogin = async () => {
     setLoading(true);
     try {
       await auth().signInWithEmailAndPassword(email, password);
       Alert.alert('Login successful');
+      setError('');
     } catch (error) {
+      setError(error.message);
       Alert.alert('Login failed', error.message);
     } finally {
       setLoading(false);
@@ -27,15 +31,21 @@ const LoginScreen = () => {
       const userCredential = await auth().createUserWithEmailAndPassword(email, password);
       const { uid } = userCredential.user;
 
-      // Save user data to Firestore
-      await firestore().collection('users').doc(uid).set({
+      await firestore().collection('user').doc(uid).set({
+        name: name,
         email: email,
-        createdAt: new Date(),
+        avatar: 'https://example.com/default-avatar.png',
+        createdAt: firestore.FieldValue.serverTimestamp(),
       });
 
-      Alert.alert('Registration successful');
+      Alert.alert('User created successfully!');
+      setEmail('');
+      setPassword('');
+      setName('');
+      setError('');
     } catch (error) {
-      Alert.alert('Registration failed', error.message);
+      setError(error.message);
+      Alert.alert('Signup failed', error.message);
     } finally {
       setLoading(false);
     }
@@ -46,6 +56,17 @@ const LoginScreen = () => {
       <Card style={styles.card}>
         <Card.Content>
           <Title style={styles.title}>{isLogin ? 'Welcome Back!' : 'Create an Account'}</Title>
+
+          {!isLogin && (
+            <TextInput
+              label="Name"
+              mode="outlined"
+              value={name}
+              onChangeText={setName}
+              style={styles.input}
+            />
+          )}
+
           <TextInput
             label="Email"
             mode="outlined"
@@ -54,6 +75,7 @@ const LoginScreen = () => {
             keyboardType="email-address"
             style={styles.input}
           />
+
           <TextInput
             label="Password"
             mode="outlined"
@@ -62,6 +84,7 @@ const LoginScreen = () => {
             secureTextEntry
             style={styles.input}
           />
+
           {loading ? (
             <ActivityIndicator animating={true} size="large" />
           ) : (
@@ -74,14 +97,15 @@ const LoginScreen = () => {
               {isLogin ? 'Login' : 'Sign Up'}
             </Button>
           )}
+
+          {error ? <Text style={styles.errorText}>{error}</Text> : null}
+
           <Button
             mode="text"
             onPress={() => setIsLogin(!isLogin)}
             labelStyle={styles.toggleText}
           >
-            {isLogin
-              ? "Don't have an account? Sign Up"
-              : 'Already have an account? Login'}
+            {isLogin ? "Don't have an account? Sign Up" : 'Already have an account? Login'}
           </Button>
         </Card.Content>
       </Card>
@@ -94,7 +118,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     padding: 20,
-    backgroundColor: '#f0f4f8', // Light background color for better readability
+    backgroundColor: '#f0f4f8',
   },
   card: {
     elevation: 4,
@@ -109,11 +133,11 @@ const styles = StyleSheet.create({
   },
   input: {
     marginBottom: 20,
-    backgroundColor: '#000', // Keep input backgrounds white
+    backgroundColor: '#ffffff',
   },
   button: {
     marginTop: 10,
-    backgroundColor: '#3498db', // Light blue for the primary action button
+    backgroundColor: '#3498db',
   },
   buttonContent: {
     paddingVertical: 8,
@@ -122,6 +146,11 @@ const styles = StyleSheet.create({
     marginTop: 10,
     textAlign: 'center',
     color: '#3498db',
+  },
+  errorText: {
+    color: 'red',
+    textAlign: 'center',
+    marginTop: 10,
   },
 });
 

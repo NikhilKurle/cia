@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { View, Text, StyleSheet, Button } from 'react-native';
 import { getAuth, signOut } from '@firebase/auth';

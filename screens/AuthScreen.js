@@ -1,42 +1,69 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, Button, StyleSheet, ScrollView, Alert } from 'react-native';
-import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from '@firebase/auth';
-import { GoogleSignin, GoogleSigninButton, statusCodes } from '@react-native-google-signin/google-signin';
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, GoogleAuthProvider, signInWithCredential } from '@firebase/auth';
+import { getFirestore, doc, setDoc, serverTimestamp } from 'firebase/firestore'; 
+import { getDatabase, ref, set } from 'firebase/database'; 
+import { GoogleSignin, GoogleSigninButton } from '@react-native-google-signin/google-signin';
+import AsyncStorage from '@react-native-async-storage/async-storage'; 
+import { useNavigation } from '@react-navigation/native';
 
 const AuthScreen = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLogin, setIsLogin] = useState(true);
-
   const auth = getAuth();
+  const firestore = getFirestore();
+  const database = getDatabase();
+  const navigation = useNavigation(); 
+
+  const storeUserIdLocally = async (userId, email) => {
+    try {
+      await AsyncStorage.setItem('userId', userId);
+      await AsyncStorage.setItem('email', email); // Also store email for support check
+    } catch (error) {
+      console.error('Error storing userId:', error);
+    }
+  };
+
+  const saveUserToRealtimeDB = async (uid, email) => {
+    try {
+      const userRef = ref(database, `users/${uid}`);
+      await set(userRef, {
+        email: email,
+        createdAt: serverTimestamp(), 
+      });
+    } catch (error) {
+      console.error('Error saving user to Realtime Database:', error);
+    }
+  };
 
   const handleAuthentication = async () => {
     try {
-      if (email === 'support@example.com' && password === 'support123') {
-        // Static credentials for support team
-        Alert.alert('Support team logged in successfully!');
-        // Here you would typically set some state or navigate to a support-specific screen
-      } else if (isLogin) {
-        await signInWithEmailAndPassword(auth, email, password);
+      let userCredential;
+      if (isLogin) {
+        userCredential = await signInWithEmailAndPassword(auth, email, password);
         Alert.alert('Signed in successfully!');
       } else {
-        await createUserWithEmailAndPassword(auth, email, password);
+        userCredential = await createUserWithEmailAndPassword(auth, email, password);
         Alert.alert('Account created successfully!');
       }
+
+      const { uid } = userCredential.user;
+
+      if (email === 'support@abc.com' && password === 'Support@123') {
+        await storeUserIdLocally(uid, email);
+        navigation.navigate('Support'); 
+        return;
+      }
+
+      await saveUserToRealtimeDB(uid, email);
+      await storeUserIdLocally(uid, email);
+
+      navigation.navigate('chats');
+
     } catch (error) {
       Alert.alert('Authentication error:', error.message);
-    }
-  };
-  const googleSignIn = async () => {
-    try {
-      await GoogleSignin.hasPlayServices();
-      const { idToken } = await GoogleSignin.signIn();
-      const credential = GoogleAuthProvider.credential(idToken);
-      await signInWithCredential(auth, credential);
-      Alert.alert('Google Sign-In successful!');
-    } catch (error) {
-      console.error('Google Sign-In error', error);
-      Alert.alert('Google Sign-In error:', error.message);
+      console.log(error.message);
     }
   };
 
@@ -63,12 +90,12 @@ const AuthScreen = () => {
           <Button title={isLogin ? 'Sign In' : 'Sign Up'} onPress={handleAuthentication} color="#3498db" />
         </View>
 
-        <GoogleSigninButton
+        {/* <GoogleSigninButton
           style={{ width: 192, height: 48 }}
           size={GoogleSigninButton.Size.Wide}
           color={GoogleSigninButton.Color.Dark}
           onPress={googleSignIn}
-        />
+        /> */}
 
         <View style={styles.bottomContainer}>
           <Text style={styles.toggleText} onPress={() => setIsLogin(!isLogin)}>
@@ -120,162 +147,5 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
 });
+
 export default AuthScreen;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
