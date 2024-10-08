@@ -1,7 +1,6 @@
-
 import React, { useEffect, useState } from 'react';
 import { View, ScrollView, StyleSheet, Alert, Platform } from 'react-native';
-import { Card, Text, Button, ActivityIndicator, DataTable } from 'react-native-paper';
+import { Card, Text, Button, ActivityIndicator } from 'react-native-paper';
 import { generateQuotation } from '../src/services/geminiService';
 import { db } from '../firebase.config';
 import RNHTMLtoPDF from 'react-native-html-to-pdf';
@@ -11,6 +10,7 @@ export default function QuotationScreen({ route }) {
   const { business, clientDetails } = route.params;
   const [quotation, setQuotation] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     generateQuotation(business, clientDetails)
@@ -18,15 +18,19 @@ export default function QuotationScreen({ route }) {
         setQuotation(result);
         setLoading(false);
         console.log(result);
-        db.collection('quotations').add({
+        return db.collection('quotations').add({
           business,
           quotation: result,
           clientDetails,
           timestamp: new Date(),
         });
       })
+      .then(() => {
+        console.log('Quotation saved to database');
+      })
       .catch(error => {
         console.error(error);
+        setError('Failed to generate or save quotation');
         setLoading(false);
       });
   }, [business, clientDetails]);
@@ -45,6 +49,11 @@ export default function QuotationScreen({ route }) {
   };
 
   const generatePDF = async () => {
+    if (!quotation) {
+      Alert.alert('Error', 'No quotation available to generate PDF.');
+      return;
+    }
+
     try {
       const html = `
         <!DOCTYPE html>
@@ -121,6 +130,23 @@ export default function QuotationScreen({ route }) {
     return (
       <View style={styles.centered}>
         <ActivityIndicator size="large" />
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={styles.centered}>
+        <Text>{error}</Text>
+        <Button onPress={() => setLoading(true)}>Retry</Button>
+      </View>
+    );
+  }
+
+  if (!quotation) {
+    return (
+      <View style={styles.centered}>
+        <Text>No quotation available. Please try again later.</Text>
       </View>
     );
   }

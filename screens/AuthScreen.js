@@ -1,39 +1,80 @@
-import React, { useState } from 'react';
-import { View, Text, TextInput, Button, StyleSheet, ScrollView, Alert } from 'react-native';
-import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, GoogleAuthProvider, signInWithCredential } from '@firebase/auth';
-import { getFirestore, doc, setDoc, serverTimestamp } from 'firebase/firestore'; 
-import { getDatabase, ref, set } from 'firebase/database'; 
-import { GoogleSignin, GoogleSigninButton } from '@react-native-google-signin/google-signin';
-import AsyncStorage from '@react-native-async-storage/async-storage'; 
-import { useNavigation } from '@react-navigation/native';
+import React, {useState, useEffect} from 'react';
+import {
+  View,
+  Text,
+  TextInput,
+  StyleSheet,
+  ScrollView,
+  Alert,
+  TouchableOpacity,
+  ImageBackground,
+  Image,
+  Dimensions,
+  Animated,
+  KeyboardAvoidingView,
+  Platform,
+} from 'react-native';
+import {
+  getAuth,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+} from 'firebase/auth';
+import {getDatabase, ref, set, serverTimestamp} from 'firebase/database';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import {useNavigation} from '@react-navigation/native';
+import LinearGradient from 'react-native-linear-gradient';
+
+const {width, height} = Dimensions.get('window');
 
 const AuthScreen = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLogin, setIsLogin] = useState(true);
+  const [animation] = useState(new Animated.Value(0));
+  const [logoAnimation] = useState(new Animated.Value(0));
+  
   const auth = getAuth();
-  const firestore = getFirestore();
   const database = getDatabase();
-  const navigation = useNavigation(); 
+  const navigation = useNavigation();
 
-  const storeUserIdLocally = async (userId, email) => {
+  useEffect(() => {
+    Animated.sequence([
+      Animated.timing(logoAnimation, {
+        toValue: 1,
+        duration: 1000,
+        useNativeDriver: true,
+      }),
+      Animated.timing(animation, {
+        toValue: 1,
+        duration: 800,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
+
+  const storeUserIdLocally = async (userId, email, userType) => {
     try {
       await AsyncStorage.setItem('userId', userId);
-      await AsyncStorage.setItem('email', email); // Also store email for support check
+      await AsyncStorage.setItem('email', email);
+      await AsyncStorage.setItem('userType', userType);
     } catch (error) {
-      console.error('Error storing userId:', error);
+      console.error('Error storing user data:', error);
     }
   };
 
   const saveUserToRealtimeDB = async (uid, email) => {
     try {
       const userRef = ref(database, `users/${uid}`);
+      const userType = email === 'support@abc.com' ? 'support' : 'client';
       await set(userRef, {
         email: email,
-        createdAt: serverTimestamp(), 
+        userType: userType,
+        createdAt: serverTimestamp(),
       });
+      return userType;
     } catch (error) {
       console.error('Error saving user to Realtime Database:', error);
+      throw error;
     }
   };
 
@@ -42,109 +83,211 @@ const AuthScreen = () => {
       let userCredential;
       if (isLogin) {
         userCredential = await signInWithEmailAndPassword(auth, email, password);
-        Alert.alert('Signed in successfully!');
+        const userSnapshot = await get(ref(database, `users/${userCredential.user.uid}`));
+        const userData = userSnapshot.val();
+        if (userData) {
+          await storeUserIdLocally(userCredential.user.uid, email, userData.userType);
+        } else {
+          throw new Error('User data not found');
+        }
       } else {
         userCredential = await createUserWithEmailAndPassword(auth, email, password);
-        Alert.alert('Account created successfully!');
+        const userType = await saveUserToRealtimeDB(userCredential.user.uid, email);
+        await storeUserIdLocally(userCredential.user.uid, email, userType);
       }
 
-      const { uid } = userCredential.user;
-
-      if (email === 'support@abc.com' && password === 'Support@123') {
-        await storeUserIdLocally(uid, email);
-        navigation.navigate('Support'); 
-        return;
+      if (email === 'support@abc.com') {
+        navigation.replace('Support');
+      } else {
+        navigation.replace('Main');
       }
-
-      await saveUserToRealtimeDB(uid, email);
-      await storeUserIdLocally(uid, email);
-
-      navigation.navigate('chats');
-
     } catch (error) {
-      Alert.alert('Authentication error:', error.message);
-      console.log(error.message);
+      Alert.alert('Error', error.message);
     }
   };
 
+  const formAnimation = {
+    transform: [
+      {
+        translateY: animation.interpolate({
+          inputRange: [0, 1],
+          outputRange: [50, 0],
+        }),
+      },
+    ],
+    opacity: animation,
+  };
+
+  const logoStyle = {
+    transform: [
+      {
+        scale: logoAnimation.interpolate({
+          inputRange: [0, 1],
+          outputRange: [0.3, 1],
+        }),
+      },
+    ],
+    opacity: logoAnimation,
+  };
+
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <View style={styles.authContainer}>
-        <Text style={styles.title}>{isLogin ? 'Sign In' : 'Sign Up'}</Text>
+    <ImageBackground
+      source={require('../assets/background.jpg')}
+      style={styles.backgroundImage}
+      resizeMode="cover">
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.container}>
+        <ScrollView
+          contentContainerStyle={styles.scrollContainer}
+          showsVerticalScrollIndicator={false}>
+          <Animated.View style={[styles.logoContainer, logoStyle]}>
+            <Image
+              source={require('../assets/logo.png')}
+              style={styles.logo}
+              resizeMode="contain"
+            />
+          </Animated.View>
 
-        <TextInput
-          style={styles.input}
-          value={email}
-          onChangeText={setEmail}
-          placeholder="Email"
-          autoCapitalize="none"
-        />
-        <TextInput
-          style={styles.input}
-          value={password}
-          onChangeText={setPassword}
-          placeholder="Password"
-          secureTextEntry
-        />
-        <View style={styles.buttonContainer}>
-          <Button title={isLogin ? 'Sign In' : 'Sign Up'} onPress={handleAuthentication} color="#3498db" />
-        </View>
+          <Animated.View style={[styles.formContainer, formAnimation]}>
+            <LinearGradient
+              colors={['rgba(255,255,255,0.9)', 'rgba(255,255,255,0.8)']}
+              style={styles.gradient}>
+              <Text style={styles.title}>{isLogin ? 'Welcome Back' : 'Join Us'}</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Email"
+                value={email}
+                onChangeText={setEmail}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                placeholderTextColor="#666"
+              />
+              <TextInput
+                style={styles.input}
+                placeholder="Password"
+                secureTextEntry
+                value={password}
+                onChangeText={setPassword}
+                placeholderTextColor="#666"
+              />
 
-        {/* <GoogleSigninButton
-          style={{ width: 192, height: 48 }}
-          size={GoogleSigninButton.Size.Wide}
-          color={GoogleSigninButton.Color.Dark}
-          onPress={googleSignIn}
-        /> */}
+              <TouchableOpacity
+                style={styles.authButton}
+                onPress={handleAuthentication}>
+                <LinearGradient
+                  colors={['#4481eb', '#04befe']}
+                  style={styles.gradient}>
+                  <Text style={styles.authButtonText}>
+                    {isLogin ? 'Login' : 'Sign Up'}
+                  </Text>
+                </LinearGradient>
+              </TouchableOpacity>
 
-        <View style={styles.bottomContainer}>
-          <Text style={styles.toggleText} onPress={() => setIsLogin(!isLogin)}>
-            {isLogin ? 'Need an account? Sign Up' : 'Already have an account? Sign In'}
-          </Text>
-        </View>
-      </View>
-    </ScrollView>
+              <TouchableOpacity
+                style={styles.switchButton}
+                onPress={() => setIsLogin(prev => !prev)}>
+                <Text style={styles.switchButtonText}>
+                  {isLogin
+                    ? "Don't have an account? Sign Up"
+                    : 'Already have an account? Login'}
+                </Text>
+              </TouchableOpacity>
+            </LinearGradient>
+          </Animated.View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </ImageBackground>
   );
 };
 
 const styles = StyleSheet.create({
+  backgroundImage: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
+  },
   container: {
+    flex: 1,
+  },
+  scrollContainer: {
     flexGrow: 1,
     justifyContent: 'center',
-    alignItems: 'center',
-    padding: 16,
-    backgroundColor: '#f0f0f0',
+    padding: 20,
   },
-  authContainer: {
-    width: '80%',
-    maxWidth: 400,
-    backgroundColor: '#fff',
-    padding: 16,
-    borderRadius: 8,
-    elevation: 3,
+  logoContainer: {
+    alignItems: 'center',
+    marginBottom: 40,
+  },
+  logo: {
+    width: width * 0.4,
+    height: width * 0.4,
+  },
+  formContainer: {
+    borderRadius: 20,
+    overflow: 'hidden',
+  },
+  gradient: {
+    padding: 20,
+    borderRadius: 20,
   },
   title: {
-    fontSize: 24,
-    marginBottom: 16,
+    fontSize: 32,
+    marginBottom: 30,
     textAlign: 'center',
+    fontWeight: 'bold',
+    color: '#1a1a1a',
+    textShadowColor: 'rgba(0, 0, 0, 0.1)',
+    textShadowOffset: {width: 1, height: 1},
+    textShadowRadius: 2,
   },
   input: {
-    height: 40,
-    borderColor: '#ddd',
-    borderWidth: 1,
-    marginBottom: 16,
-    padding: 8,
-    borderRadius: 4,
+    height: 55,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    borderRadius: 27.5,
+    marginBottom: 15,
+    paddingHorizontal: 25,
+    fontSize: 16,
+    color: '#333',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 5,
   },
-  buttonContainer: {
-    marginBottom: 16,
+  authButton: {
+    borderRadius: 2,
+    overflow: 'hidden',
+    marginTop: 10,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 4.65,
+    elevation: 8,
   },
-  toggleText: {
-    color: '#3498db',
+  authButtonText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: 'bold',
     textAlign: 'center',
+    paddingVertical: 5,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
   },
-  bottomContainer: {
+  switchButton: {
+    alignItems: 'center',
     marginTop: 20,
+  },
+  switchButtonText: {
+    color: '#333',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
 
